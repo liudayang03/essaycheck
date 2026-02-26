@@ -1,53 +1,52 @@
-const fs = require('fs');
-const path = require('path');
+// Cloudflare Pages 函数版，使用 fetch 读取 JSON 文件
 
-// 在 Vercel 的 Serverless 环境中，process.cwd() 指向项目根目录
-const dataDir = path.join(process.cwd(), 'data');
-
-// 加载 5 个 JSON 标准文件
-let cat1, cat2, cat3, cat4, cat5;
-try {
-  cat1 = JSON.parse(fs.readFileSync(path.join(dataDir, 'standards_cat1.json'), 'utf-8'));
-  cat2 = JSON.parse(fs.readFileSync(path.join(dataDir, 'standards_cat2.json'), 'utf-8'));
-  cat3 = JSON.parse(fs.readFileSync(path.join(dataDir, 'standards_cat3.json'), 'utf-8'));
-  cat4 = JSON.parse(fs.readFileSync(path.join(dataDir, 'standards_cat4.json'), 'utf-8'));
-  cat5 = JSON.parse(fs.readFileSync(path.join(dataDir, 'standards_cat5.json'), 'utf-8'));
-  console.log('✅ 所有 JSON 标准文件加载成功');
-} catch (error) {
-  console.error('❌ JSON 标准文件加载失败:', error.message);
-  // 如果文件加载失败，提供空数据防止完全崩溃
-  cat1 = { PersonalStrengths: { category: 'Personal Strengths', items: [] } };
-  cat2 = { LogicalConsistency: { category: 'Logical Consistency', items: [] } };
-  cat3 = { LogicalConsistency: { category: 'Logical Consistency', items: [] } };
-  cat4 = { Readability: { category: 'Readability', items: [] } };
-  cat5 = { LanguageQuality: { category: 'Language Quality', items: [] } };
-}
-
-// 提取每个类别的主对象
-const categories = [
-  { ...cat1.PersonalStrengths, key: 'PersonalStrengths' },
-  { ...cat2.LogicalConsistency, key: 'LogicalConsistency' },
-  { ...cat3.LogicalConsistency, key: 'LogicalConsistency2' },
-  { ...cat4.Readability, key: 'Readability' },
-  { ...cat5.LanguageQuality, key: 'LanguageQuality' }
-];
-
-module.exports = async (req, res) => {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: '只支持 POST 请求' });
+export async function onRequest(context) {
+  const { request, env } = context;
+  
+  // 只允许 POST 请求
+  if (request.method !== 'POST') {
+    return new Response(JSON.stringify({ error: '只支持 POST 请求' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   try {
-    const { essay } = req.body;
+    // 读取请求体
+    const { essay } = await request.json();
     
     if (!essay || typeof essay !== 'string') {
-      return res.status(400).json({ error: '无效的文书内容' });
+      return new Response(JSON.stringify({ error: '无效的文书内容' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
-    // 并行调用所有类别
+    // 获取当前请求的 URL 基础路径
+    const url = new URL(request.url);
+    const baseUrl = `${url.protocol}//${url.host}`;
+
+    // 并行加载 5 个 JSON 标准文件
+    const [cat1, cat2, cat3, cat4, cat5] = await Promise.all([
+      fetch(`${baseUrl}/data/standards_cat1.json`).then(r => r.json()),
+      fetch(`${baseUrl}/data/standards_cat2.json`).then(r => r.json()),
+      fetch(`${baseUrl}/data/standards_cat3.json`).then(r => r.json()),
+      fetch(`${baseUrl}/data/standards_cat4.json`).then(r => r.json()),
+      fetch(`${baseUrl}/data/standards_cat5.json`).then(r => r.json())
+    ]);
+
+    // 提取每个类别的主对象
+    const categories = [
+      { ...cat1.PersonalStrengths, key: 'PersonalStrengths' },
+      { ...cat2.LogicalConsistency, key: 'LogicalConsistency' },
+      { ...cat3.LogicalConsistency, key: 'LogicalConsistency2' },
+      { ...cat4.Readability, key: 'Readability' },
+      { ...cat5.LanguageQuality, key: 'LanguageQuality' }
+    ];
+
+    // 并行调用 DeepSeek API 评估所有类别
     const results = await Promise.all(categories.map(async (cat) => {
       if (!cat.items || cat.items.length === 0) {
-        console.warn(`类别 ${cat.category} 没有定义 items，跳过`);
         return {
           categoryName: cat.category,
           score: 0,
@@ -97,7 +96,7 @@ ${essay}
       const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+          'Authorization': `Bearer ${env.DEEPSEEK_API_KEY}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -127,7 +126,6 @@ ${essay}
         return JSON.parse(content);
       } catch (e) {
         console.error(`解析 ${cat.category} 结果失败:`, e.message);
-        console.error('原始内容:', data.choices[0].message.content);
         return {
           categoryName: cat.category,
           score: 0,
@@ -136,19 +134,26 @@ ${essay}
         };
       }
     }));
-    
+
     // 计算总分
     const totalScore = results.reduce((sum, cat) => sum + (cat.score || 0), 0);
-    
-    res.status(200).json({
+
+    // 返回结果
+    return new Response(JSON.stringify({
       totalScore,
       deductPoints: 90 - totalScore,
       overallSummary: "综合评估完成",
       categories: results
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
     });
 
   } catch (error) {
     console.error('评估过程出错:', error);
-    res.status(500).json({ error: '评估失败: ' + error.message });
+    return new Response(JSON.stringify({ error: '评估失败: ' + error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
-};
+}
