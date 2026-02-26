@@ -1,3 +1,5 @@
 {
-  "type": "module"
+  "name": "essayrater",
+  "version": "1.0.0",
+  "private": true
 }
