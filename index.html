@@ -78,7 +78,6 @@
         .result-empty h3 { font-size: 18px; margin-bottom: 8px; color: #111827; }
         .result-empty p { font-size: 14px; max-width: 300px; }
 
-        /* 评估结果样式 */
         .summary-card { background: white; border-radius: 12px; border: 1px solid #e5e7eb; padding: 24px; margin-bottom: 24px; }
         .score-badge { font-size: 24px; font-weight: bold; color: #dc2626; }
         .category-card { border: 1px solid #fecaca; border-radius: 12px; margin-bottom: 24px; }
@@ -141,7 +140,7 @@
                 </div>
                 <div class="card-content">
                     <textarea id="essay" placeholder="请在此输入您的文书内容..."></textarea>
-                    <button onclick="evaluate()" id="evaluateBtn">开始评估</button>
+                    <button onclick="evaluateEssay()" id="evaluateBtn">开始评估</button>
                 </div>
             </div>
 
@@ -162,7 +161,7 @@
     </div>
 
     <script>
-        async function evaluate() {
+        async function evaluateEssay() {
             const essay = document.getElementById('essay').value;
             const btn = document.getElementById('evaluateBtn');
             const resultDiv = document.getElementById('result');
