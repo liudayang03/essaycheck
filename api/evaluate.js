@@ -6,13 +6,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // 加载 5 个 JSON
-const cat1 = JSON.parse(fs.readFileSync(path.join(__dirname, '../data/standards_cat1.json'), 'utf-8'));
-const cat2 = JSON.parse(fs.readFileSync(path.join(__dirname, '../data/standards_cat2.json'), 'utf-8'));
-const cat3 = JSON.parse(fs.readFileSync(path.join(__dirname, '../data/standards_cat3.json'), 'utf-8'));
-const cat4 = JSON.parse(fs.readFileSync(path.join(__dirname, '../data/standards_cat4.json'), 'utf-8'));
-const cat5 = JSON.parse(fs.readFileSync(path.join(__dirname, '../data/standards_cat5.json'), 'utf-8'));
+const cat1 = JSON.parse(fs.readFileSync(path.join(__dirname, 'standards_cat1.json'), 'utf-8'));
+const cat2 = JSON.parse(fs.readFileSync(path.join(__dirname, 'standards_cat2.json'), 'utf-8'));
+const cat3 = JSON.parse(fs.readFileSync(path.join(__dirname, 'standards_cat3.json'), 'utf-8'));
+const cat4 = JSON.parse(fs.readFileSync(path.join(__dirname, 'standards_cat4.json'), 'utf-8'));
+const cat5 = JSON.parse(fs.readFileSync(path.join(__dirname, 'standards_cat5.json'), 'utf-8'));
 
-// 提取每个类别的主对象
 const categories = [
   { ...cat1.PersonalStrengths, key: 'PersonalStrengths' },
   { ...cat2.LogicalConsistency, key: 'LogicalConsistency' },
@@ -22,12 +21,24 @@ const categories = [
 ];
 
 export default async function handler(req, res) {
+  // 添加 CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
   if (req.method !== 'POST') {
     return res.status(405).json({ error: '只支持 POST 请求' });
   }
 
   try {
     const { essay } = req.body;
+    if (!essay) {
+      return res.status(400).json({ error: '缺少 essay 参数' });
+    }
     
     const results = [];
     
@@ -87,24 +98,63 @@ ${essay}
         })
       });
 
+      // 检查 HTTP 状态
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`API HTTP 错误 (${cat.category}):`, response.status, errorText.substring(0, 500));
+        throw new Error(`DeepSeek API 错误: ${response.status}`);
+      }
+
       const data = await response.json();
       
+      // 检查 API 返回结构
+      if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+        console.error('意外的 API 响应:', JSON.stringify(data).substring(0, 500));
+        throw new Error('API 响应格式异常');
+      }
+      
+      let content = data.choices[0].message.content;
+      
+      // 清理 markdown 代码块标记
+      content = content.replace(/```json\s*/g, '').replace(/```\s*$/g, '').trim();
+      
+      // 如果内容被引号包裹，去掉外层引号
+      if ((content.startsWith('"') && content.endsWith('"')) || 
+          (content.startsWith("'") && content.endsWith("'"))) {
+        content = content.slice(1, -1);
+      }
+      
       try {
-        const result = JSON.parse(data.choices[0].message.content);
+        const result = JSON.parse(content);
         results.push(result);
-      } catch (e) {
-        console.error('解析失败', cat.category);
-        // 如果解析失败，加一个空结果占位
+      } catch (parseError) {
+        console.error(`JSON 解析失败 (${cat.category}):`, parseError.message);
+        console.error('原始内容前500字符:', content.substring(0, 500));
+        
+        // 尝试提取 JSON 部分（如果 LLM 返回了额外文本）
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            const result = JSON.parse(jsonMatch[0]);
+            results.push(result);
+            continue;
+          } catch (e) {
+            console.error('提取 JSON 也失败了');
+          }
+        }
+        
+        // 解析失败时添加占位结果
         results.push({
           categoryName: cat.category,
           score: 0,
           maxScore: cat.items.length * 5,
-          standards: []
+          standards: [],
+          error: '解析失败',
+          rawContent: content.substring(0, 200)
         });
       }
     }
     
-    // 计算总分（假设满分90）
     const totalScore = results.reduce((sum, cat) => sum + (cat.score || 0), 0);
     
     res.json({
@@ -115,7 +165,11 @@ ${essay}
     });
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: '评估失败' });
+    console.error('服务器错误:', error);
+    res.status(500).json({ 
+      error: '评估失败', 
+      details: error.message,
+      stack: error.stack
+    });
   }
 }
