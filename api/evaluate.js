@@ -120,10 +120,19 @@ ${essay}
       const data = await response.json();
       
       try {
-        const result = JSON.parse(data.choices[0].message.content);
+        let content = data.choices[0].message.content;
+        
+        // 【关键修复】去掉 Markdown 代码块标记
+        // 去掉开头的 ```json 或 ```（可能带空格）
+        content = content.replace(/^```json\s*/, '').replace(/^```\s*/, '');
+        // 去掉结尾的 ```
+        content = content.replace(/\s*```$/, '');
+        
+        const result = JSON.parse(content);
         results.push(result);
       } catch (e) {
         console.error(`解析 ${cat.category} 结果失败:`, e.message);
+        console.error('原始内容:', data.choices[0].message.content); // 打印出来看看
         // 如果解析失败，加一个空结果占位
         results.push({
           categoryName: cat.category,
