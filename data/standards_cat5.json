@@ -1,0 +1,37 @@
+{
+  "LanguageQuality": {
+    "category": "Language Quality",
+    "items": [
+      {
+        "name": "Natural Diction",
+        "grading": {
+          "1": "特征：逻辑断层与直译错误。定义：存在明显的母语干扰和语法降级。例子：Drink soup (应为eat), Big rain (应为heavy), Close the light (应为turn off), I very like math (语序错误), My body is very healthy (应为I am healthy)。成语误用如：People mountain people sea; get half the effort and double the result。",
+          "2": "特征：辞藻通胀与AI痕迹。定义：使用虚假的高级词汇导致语义过载，包含大量AI常用套话及中介风格词汇。AI必杀词：Tapestry, Beacon, Testament, Catalyst, Embark, Journey, Metamorphosis, Invaluable, Relentless, Passionate, Delve, Unveil, Resonate, Symphony, Interplay, Paradigm。中介油腻词：Spearhead, Orchestrate, Empower, Envision, Pioneer, Transformative, Groundbreaking, Influential, Paradigm shift, Multifaceted, Synergy, Facilitate。例：I spearheaded a multifaceted team to orchestrate a transformative solution...",
+          "3": "特征：基础词汇依赖。定义：语言表达极度单一，过度依赖简单基础词库，无法描述复杂情绪或深度场景。常用词：Good, Nice, Bad, Thing, People, Big, Small, Important, Very, Really, Use, Think, Feel, Help, Change, Happy, Sad, Many, A lot of。例句：I thought the experience was good and very significant because I realized that helping people is important。",
+          "4": "特征：地道精准。定义：精准动词替代“动词+副词”，使用具象名词。精准动词库：Tackle, Pivot, Curb, Fuel, Dissolve, Navigate, Galvanize, Crystallize, Overhaul。例：I pivoted the project... (代替 I changed the project very quickly)。",
+          "5": "特征：极致自然。A.物理动作寄生：Saturated with data (而非 Data is a lot)；B.语义微差死磕：Observe->Scrutinize->Interrogate；C.极致效率：The shift drained me (代替 I felt very tired because of the shift)。"
+        }
+      },
+      {
+        "name": "Sentence Flow",
+        "grading": {
+          "1": "特征：长难句迷宫。定义：语法混乱，嵌套过深导致认知过载。例：The fundamental reason why I, after considering all factors... was because...",
+          "2": "特征：单调重复。定义：句式雷同，缺乏长短结合。例：I love music. I play piano. I like Mozart. Mozart is great。",
+          "3": "特征：中规中矩。定义：结构单一，句式重复，衔接生硬。例：I went to the school. Then I saw a child. He was crying. So I helped him。",
+          "4": "特征：动词驱动。定义：零预热直接入场，通过强动词实现信息压缩。例：A singed capacitor on the motherboard explained the system crash. I spent the afternoon desoldering the failure。",
+          "5": "特征：节奏大师。方式：长短结合，急促的事句子快，沉重的事句子慢。例：...the cursor finally flickered. It moved。"
+        }
+      },
+      {
+        "name": "Modifier Precision",
+        "grading": {
+          "1": "特征：副词灾难。定义：极度依赖 totally, actually, very, extremely 等补丁词汇，滥用最高级。例：I was extremely passionate and truly excited about this really great opportunity。",
+          "2": "特征：形容词膨胀。定义：语义重叠的二元堆砌，或使用无实际意义的万能褒义词。例：Gained invaluable skills and profound insights；difficult and challenging；huge giant。",
+          "3": "特征：描述平实。定义：修饰词使用合理，但缺乏亮点。分析：能表达意思，但没有文学美感。",
+          "4": "特征：剔除元叙事。定义：不播报意图，让细节自己开口；利用具象名词替代抽象逻辑。方式：A.具象锚点：The weight of the project anchored me (而非 I felt a sense of heavy responsibility)。B.结果先行：My budget was a straitjacket。C.直接呈现：I returned to the lab, not out of hope, but out of a stubborn refusal to let the data win。",
+          "5": "特征：零修饰力量。方式：用事实本身代替形容词。例：不写“非常有爱心”，写“我每周六清晨五点准时出现在流浪猫收容所”。"
+        }
+      }
+    ]
+  }
+}

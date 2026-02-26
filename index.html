@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>美国大学申请文书评估系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui; background: linear-gradient(to bottom right, #eff6ff, white, #faf5ff); min-height: 100vh; }
+        
+        .header {
+            border-bottom: 1px solid #e5e7eb;
+            background: rgba(255,255,255,0.8);
+            backdrop-filter: blur(8px);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .container { max-width: 1280px; margin: 0 auto; padding: 0 2rem; }
+        .header .container { display: flex; align-items: center; gap: 12px; padding: 16px 2rem; }
+        .logo { background: linear-gradient(to right, #2563eb, #9333ea); padding: 8px; border-radius: 8px; }
+        .logo svg { width: 24px; height: 24px; color: white; }
+        h1 { font-size: 24px; font-weight: bold; background: linear-gradient(to right, #2563eb, #9333ea); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+        .main { padding: 32px 0; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+
+        .card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e5e7eb; }
+        .card-header { padding: 24px 24px 0; }
+        .card-title { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+        .card-title svg { width: 20px; height: 20px; color: #9333ea; display: inline; margin-right: 8px; }
+        .card-desc { color: #6b7280; font-size: 14px; }
+        .card-content { padding: 24px; }
+
+        textarea {
+            width: 100%;
+            height: 500px;
+            padding: 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+            resize: none;
+        }
+        textarea:focus { outline: none; border-color: #9333ea; box-shadow: 0 0 0 2px rgba(147,51,234,0.2); }
+
+        button {
+            width: 100%;
+            padding: 12px 24px;
+            background: linear-gradient(to right, #2563eb, #9333ea);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 16px;
+        }
+        button:hover { opacity: 0.9; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .result-area {
+            background: white;
+            border-radius: 12px;
+            border: 1px solid #e5e7eb;
+            padding: 24px;
+            min-height: 500px;
+        }
+        .result-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 400px;
+            text-align: center;
+            color: #6b7280;
+        }
+        .result-empty svg { width: 32px; height: 32px; margin-bottom: 16px; color: #9ca3af; }
+        .result-empty h3 { font-size: 18px; margin-bottom: 8px; color: #111827; }
+        .result-empty p { font-size: 14px; max-width: 300px; }
+
+        /* 评估结果样式 */
+        .summary-card { background: white; border-radius: 12px; border: 1px solid #e5e7eb; padding: 24px; margin-bottom: 24px; }
+        .score-badge { font-size: 24px; font-weight: bold; color: #dc2626; }
+        .category-card { border: 1px solid #fecaca; border-radius: 12px; margin-bottom: 24px; }
+        .category-header { padding: 24px; border-bottom: 1px solid #fecaca; }
+        .category-header h3 { font-size: 20px; font-weight: 600; color: #dc2626; }
+        .category-header h3 svg { width: 20px; height: 20px; display: inline; margin-right: 8px; }
+        .category-content { padding: 24px; }
+        .standard-item {
+            border-left: 4px solid #dc2626;
+            background: #fef2f2;
+            border-radius: 0 8px 8px 0;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .standard-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .standard-name { font-weight: 600; color: #7f1d1d; }
+        .standard-score { color: #b91c1c; font-size: 14px; }
+        .standard-problem { color: #991b1b; font-size: 14px; margin-bottom: 12px; }
+        .example-box {
+            background: rgba(254,242,242,0.5);
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 8px;
+        }
+        .example-box div { margin-bottom: 4px; font-size: 14px; }
+        .example-box .label { font-weight: 500; color: #7f1d1d; }
+        .loading { display: flex; align-items: center; gap: 8px; color: #6b7280; }
+        .spinner { width: 16px; height: 16px; border: 2px solid #e5e7eb; border-top-color: #9333ea; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .error { color: #dc2626; margin-top: 8px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <div class="logo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" stroke-width="2"/>
+                    <path d="M14 2v6h6" stroke-width="2"/>
+                </svg>
+            </div>
+            <h1>美国大学申请文书评估系统</h1>
+        </div>
+    </div>
+
+    <div class="main container">
+        <div class="grid">
+            <!-- 左边输入 -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" stroke-width="2"/>
+                            <path d="M14 2v6h6" stroke-width="2"/>
+                        </svg>
+                        输入文书
+                    </div>
+                    <div class="card-desc">粘贴或输入您的申请文书内容</div>
+                </div>
+                <div class="card-content">
+                    <textarea id="essay" placeholder="请在此输入您的文书内容..."></textarea>
+                    <button onclick="evaluate()" id="evaluateBtn">开始评估</button>
+                </div>
+            </div>
+
+            <!-- 右边结果 -->
+            <div>
+                <div id="result" class="result-area">
+                    <div class="result-empty">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" stroke-width="2"/>
+                            <path d="M14 2v6h6" stroke-width="2"/>
+                        </svg>
+                        <h3>等待评估</h3>
+                        <p>请在左侧输入文书内容，然后点击"开始评估"按钮</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function evaluate() {
+            const essay = document.getElementById('essay').value;
+            const btn = document.getElementById('evaluateBtn');
+            const resultDiv = document.getElementById('result');
+            
+            if (!essay) return alert('请输入文书');
+            
+            btn.disabled = true;
+            resultDiv.innerHTML = '<div class="result-empty"><div class="loading"><div class="spinner"></div>评估中...（约15秒）</div></div>';
+            
+            try {
+                const res = await fetch('/api/evaluate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ essay })
+                });
+                
+                const data = await res.json();
+                
+                let html = '';
+                
+                // 总分
+                html += `<div class="summary-card">
+                    <div class="score-badge">距离90分还差${data.deductPoints || 0}分</div>
+                    <p style="margin-top:12px; color:#4b5563;">${data.overallSummary || ''}</p>
+                </div>`;
+                
+                // 五大类
+                if (data.categories) {
+                    data.categories.forEach(cat => {
+                        html += `<div class="category-card">
+                            <div class="category-header">
+                                <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke-width="2"/>
+                                </svg>${cat.categoryName} <span style="font-size:14px; font-weight:normal; margin-left:8px;">${cat.score}/${cat.maxScore}分</span></h3>
+                            </div>
+                            <div class="category-content">`;
+                        
+                        if (cat.standards && cat.standards.length > 0) {
+                            cat.standards.forEach(std => {
+                                html += `<div class="standard-item">
+                                    <div class="standard-header">
+                                        <span class="standard-name">${std.name}</span>
+                                        <span class="standard-score">${std.score}/${std.maxScore}分</span>
+                                    </div>
+                                    <div class="standard-problem">${std.problem || ''}</div>`;
+                                
+                                if (std.examples && std.examples.length > 0) {
+                                    std.examples.forEach(ex => {
+                                        html += `<div class="example-box">
+                                            <div><span class="label">原文：</span>"${ex.original || ''}"</div>
+                                            <div><span class="label">问题：</span>${ex.issue || ''}</div>
+                                            <div><span class="label">建议：</span>${ex.suggestion || ''}</div>
+                                            <div><span class="label">原因：</span>${ex.reason || ''}</div>
+                                            <div><span class="label">效果对比：</span>${ex.comparison || ''}</div>
+                                        </div>`;
+                                    });
+                                }
+                                
+                                html += `</div>`;
+                            });
+                        }
+                        
+                        html += `</div></div>`;
+                    });
+                }
+                
+                resultDiv.innerHTML = html;
+                
+            } catch (err) {
+                resultDiv.innerHTML = `<div class="error">评估失败：${err.message}</div>`;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
