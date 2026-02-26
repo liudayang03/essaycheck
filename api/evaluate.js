@@ -32,9 +32,7 @@ const categories = [
   { ...cat5.LanguageQuality, key: 'LanguageQuality' }
 ];
 
-// 使用 CommonJS 的导出方式
 module.exports = async (req, res) => {
-  // 只允许 POST 请求
   if (req.method !== 'POST') {
     return res.status(405).json({ error: '只支持 POST 请求' });
   }
@@ -42,19 +40,20 @@ module.exports = async (req, res) => {
   try {
     const { essay } = req.body;
     
-    // 验证输入
     if (!essay || typeof essay !== 'string') {
       return res.status(400).json({ error: '无效的文书内容' });
     }
 
-    const results = [];
-    
-    // 循环评估每个类别
-    for (const cat of categories) {
-      // 确保类别有 items
+    // 并行调用所有类别
+    const results = await Promise.all(categories.map(async (cat) => {
       if (!cat.items || cat.items.length === 0) {
         console.warn(`类别 ${cat.category} 没有定义 items，跳过`);
-        continue;
+        return {
+          categoryName: cat.category,
+          score: 0,
+          maxScore: 0,
+          standards: []
+        };
       }
 
       const prompt = `
@@ -95,7 +94,6 @@ ${essay}
 注意：只列不足，不说优点。没有问题的标准不要包含。
 `;
 
-      // 调用 DeepSeek API
       const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -121,32 +119,27 @@ ${essay}
       
       try {
         let content = data.choices[0].message.content;
-        
-        // 【关键修复】去掉 Markdown 代码块标记
-        // 去掉开头的 ```json 或 ```（可能带空格）
+        // 去掉 Markdown 代码块标记
         content = content.replace(/^```json\s*/, '').replace(/^```\s*/, '');
-        // 去掉结尾的 ```
         content = content.replace(/\s*```$/, '');
+        content = content.trim();
         
-        const result = JSON.parse(content);
-        results.push(result);
+        return JSON.parse(content);
       } catch (e) {
         console.error(`解析 ${cat.category} 结果失败:`, e.message);
-        console.error('原始内容:', data.choices[0].message.content); // 打印出来看看
-        // 如果解析失败，加一个空结果占位
-        results.push({
+        console.error('原始内容:', data.choices[0].message.content);
+        return {
           categoryName: cat.category,
           score: 0,
           maxScore: cat.items.length * 5,
           standards: []
-        });
+        };
       }
-    }
+    }));
     
     // 计算总分
     const totalScore = results.reduce((sum, cat) => sum + (cat.score || 0), 0);
     
-    // 返回最终结果
     res.status(200).json({
       totalScore,
       deductPoints: 90 - totalScore,
