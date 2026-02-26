@@ -1,17 +1,29 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+const fs = require('fs');
+const path = require('path');
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// 在 Vercel 的 Serverless 环境中，process.cwd() 指向项目根目录
+const dataDir = path.join(process.cwd(), 'data');
 
-// 加载 5 个 JSON
-const cat1 = JSON.parse(fs.readFileSync(path.join(__dirname, 'standards_cat1.json'), 'utf-8'));
-const cat2 = JSON.parse(fs.readFileSync(path.join(__dirname, 'standards_cat2.json'), 'utf-8'));
-const cat3 = JSON.parse(fs.readFileSync(path.join(__dirname, 'standards_cat3.json'), 'utf-8'));
-const cat4 = JSON.parse(fs.readFileSync(path.join(__dirname, 'standards_cat4.json'), 'utf-8'));
-const cat5 = JSON.parse(fs.readFileSync(path.join(__dirname, 'standards_cat5.json'), 'utf-8'));
+// 加载 5 个 JSON 标准文件
+let cat1, cat2, cat3, cat4, cat5;
+try {
+  cat1 = JSON.parse(fs.readFileSync(path.join(dataDir, 'standards_cat1.json'), 'utf-8'));
+  cat2 = JSON.parse(fs.readFileSync(path.join(dataDir, 'standards_cat2.json'), 'utf-8'));
+  cat3 = JSON.parse(fs.readFileSync(path.join(dataDir, 'standards_cat3.json'), 'utf-8'));
+  cat4 = JSON.parse(fs.readFileSync(path.join(dataDir, 'standards_cat4.json'), 'utf-8'));
+  cat5 = JSON.parse(fs.readFileSync(path.join(dataDir, 'standards_cat5.json'), 'utf-8'));
+  console.log('✅ 所有 JSON 标准文件加载成功');
+} catch (error) {
+  console.error('❌ JSON 标准文件加载失败:', error.message);
+  // 如果文件加载失败，提供空数据防止完全崩溃
+  cat1 = { PersonalStrengths: { category: 'Personal Strengths', items: [] } };
+  cat2 = { LogicalConsistency: { category: 'Logical Consistency', items: [] } };
+  cat3 = { LogicalConsistency: { category: 'Logical Consistency', items: [] } };
+  cat4 = { Readability: { category: 'Readability', items: [] } };
+  cat5 = { LanguageQuality: { category: 'Language Quality', items: [] } };
+}
 
+// 提取每个类别的主对象
 const categories = [
   { ...cat1.PersonalStrengths, key: 'PersonalStrengths' },
   { ...cat2.LogicalConsistency, key: 'LogicalConsistency' },
@@ -20,29 +32,31 @@ const categories = [
   { ...cat5.LanguageQuality, key: 'LanguageQuality' }
 ];
 
-export default async function handler(req, res) {
-  // 添加 CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  
+// 使用 CommonJS 的导出方式
+module.exports = async (req, res) => {
+  // 只允许 POST 请求
   if (req.method !== 'POST') {
     return res.status(405).json({ error: '只支持 POST 请求' });
   }
 
   try {
     const { essay } = req.body;
-    if (!essay) {
-      return res.status(400).json({ error: '缺少 essay 参数' });
-    }
     
+    // 验证输入
+    if (!essay || typeof essay !== 'string') {
+      return res.status(400).json({ error: '无效的文书内容' });
+    }
+
     const results = [];
     
+    // 循环评估每个类别
     for (const cat of categories) {
+      // 确保类别有 items
+      if (!cat.items || cat.items.length === 0) {
+        console.warn(`类别 ${cat.category} 没有定义 items，跳过`);
+        continue;
+      }
+
       const prompt = `
 你是一位严格的美国大学申请文书评估专家。
 
@@ -81,6 +95,7 @@ ${essay}
 注意：只列不足，不说优点。没有问题的标准不要包含。
 `;
 
+      // 调用 DeepSeek API
       const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -98,66 +113,32 @@ ${essay}
         })
       });
 
-      // 检查 HTTP 状态
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`API HTTP 错误 (${cat.category}):`, response.status, errorText.substring(0, 500));
-        throw new Error(`DeepSeek API 错误: ${response.status}`);
+        throw new Error(`DeepSeek API 调用失败: ${response.status}`);
       }
 
       const data = await response.json();
       
-      // 检查 API 返回结构
-      if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-        console.error('意外的 API 响应:', JSON.stringify(data).substring(0, 500));
-        throw new Error('API 响应格式异常');
-      }
-      
-      let content = data.choices[0].message.content;
-      
-      // 清理 markdown 代码块标记
-      content = content.replace(/```json\s*/g, '').replace(/```\s*$/g, '').trim();
-      
-      // 如果内容被引号包裹，去掉外层引号
-      if ((content.startsWith('"') && content.endsWith('"')) || 
-          (content.startsWith("'") && content.endsWith("'"))) {
-        content = content.slice(1, -1);
-      }
-      
       try {
-        const result = JSON.parse(content);
+        const result = JSON.parse(data.choices[0].message.content);
         results.push(result);
-      } catch (parseError) {
-        console.error(`JSON 解析失败 (${cat.category}):`, parseError.message);
-        console.error('原始内容前500字符:', content.substring(0, 500));
-        
-        // 尝试提取 JSON 部分（如果 LLM 返回了额外文本）
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          try {
-            const result = JSON.parse(jsonMatch[0]);
-            results.push(result);
-            continue;
-          } catch (e) {
-            console.error('提取 JSON 也失败了');
-          }
-        }
-        
-        // 解析失败时添加占位结果
+      } catch (e) {
+        console.error(`解析 ${cat.category} 结果失败:`, e.message);
+        // 如果解析失败，加一个空结果占位
         results.push({
           categoryName: cat.category,
           score: 0,
           maxScore: cat.items.length * 5,
-          standards: [],
-          error: '解析失败',
-          rawContent: content.substring(0, 200)
+          standards: []
         });
       }
     }
     
+    // 计算总分
     const totalScore = results.reduce((sum, cat) => sum + (cat.score || 0), 0);
     
-    res.json({
+    // 返回最终结果
+    res.status(200).json({
       totalScore,
       deductPoints: 90 - totalScore,
       overallSummary: "综合评估完成",
@@ -165,11 +146,7 @@ ${essay}
     });
 
   } catch (error) {
-    console.error('服务器错误:', error);
-    res.status(500).json({ 
-      error: '评估失败', 
-      details: error.message,
-      stack: error.stack
-    });
+    console.error('评估过程出错:', error);
+    res.status(500).json({ error: '评估失败: ' + error.message });
   }
-}
+};
